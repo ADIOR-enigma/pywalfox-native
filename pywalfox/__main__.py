@@ -3,6 +3,7 @@ import sys
 import atexit
 import logging
 import argparse
+import json
 import subprocess
 
 from .daemon import Daemon
@@ -43,7 +44,7 @@ parser.add_argument('action',
         nargs='?',
         default=None,
         metavar='ACTION',
-        help='available actions are install, uninstall, start, update, log, dark, light and auto')
+        help='available actions are install, uninstall, start, update, log, dark, light, auto, option and website-css')
 parser.add_argument('-v', '--version',
         dest='version',
         action='store_true',
@@ -75,6 +76,10 @@ setup_group.add_argument('--profile-path',
         type=str,
         default=None,
         help='overrides profiles directory path')
+parser.add_argument('params',
+        nargs='*',
+        metavar='PARAM',
+        help='additional parameters for commands like `option <name> <value>`')
 
 def apply_saved_profile_path(cli_override=None):
     """
@@ -102,6 +107,47 @@ def get_python_version():
 
     return python_version
 
+
+def parse_bool(value):
+    """
+    Parses a string-like CLI value into a boolean.
+
+    :param value str: the value to parse
+    :return: the parsed boolean value
+    :rType: bool
+    """
+    normalized = str(value).lower()
+    if normalized in ('1', 'true', 'yes', 'on', 'enable', 'enabled'):
+        return True
+    if normalized in ('0', 'false', 'no', 'off', 'disable', 'disabled'):
+        return False
+
+    raise ValueError('expected one of: on/off, true/false, yes/no, 1/0')
+
+def create_option_set_command(option, value):
+    """
+    Creates a JSON-encoded option:set command for the daemon socket.
+
+    :param option str: the extension option to set
+    :param value any: the requested option value
+    :return: encoded socket command
+    :rType: str
+    """
+    data = {
+        'action': COMMANDS['OPTION_SET'],
+        'data': {
+            'option': option,
+        },
+    }
+
+    if isinstance(value, bool):
+        data['data']['enabled'] = value
+        data['data']['value'] = value
+    else:
+        data['data']['value'] = value
+
+    return json.dumps(data)
+
 def send_client_command(message):
     """
     Sends a message to the socket server.
@@ -114,6 +160,56 @@ def send_client_command(message):
         connected = client.connect(host)
         if connected is True:
             client.send_message(message)
+
+
+def send_option_set(option, value):
+    """
+    Sends an option:set command to the addon through the running daemon.
+
+    :param option str: the extension option to set
+    :param value any: the requested option value
+    """
+    send_client_command(create_option_set_command(option, value))
+
+def send_website_css(params):
+    """
+    Sends a websiteCssVariables control command to the addon.
+
+    :param params list: command parameters, expecting on/off/toggle
+    """
+    if len(params) != 1:
+        print('Usage: pywalfox website-css <on|off|toggle>')
+        sys.exit(1)
+
+    value = params[0].lower()
+    if value == 'toggle':
+        send_option_set('websiteCssVariables', 'toggle')
+        return
+
+    try:
+        send_option_set('websiteCssVariables', parse_bool(value))
+    except ValueError as error:
+        print('Invalid website-css value: %s' % error)
+        sys.exit(1)
+
+def send_option_command(params):
+    """
+    Sends a generic option:set command to the addon.
+
+    :param params list: command parameters, expecting option and value
+    """
+    if len(params) != 2:
+        print('Usage: pywalfox option <option> <value>')
+        sys.exit(1)
+
+    option = params[0]
+    value = params[1]
+    try:
+        value = parse_bool(value)
+    except ValueError:
+        pass
+
+    send_option_set(option, value)
 
 def send_update_action():
     """Sends an update command to the addon, triggering a refetch of colors"""
@@ -169,6 +265,14 @@ def handle_args(args):
 
     if args.action == 'update':
         send_update_action()
+        sys.exit(0)
+
+    if args.action == 'website-css':
+        send_website_css(args.params)
+        sys.exit(0)
+
+    if args.action == 'option':
+        send_option_command(args.params)
         sys.exit(0)
 
     if args.action == 'dark':

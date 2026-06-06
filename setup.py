@@ -27,7 +27,10 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
     ],
     packages=setuptools.find_namespace_packages(include=["pywalfox", "pywalfox.*"]),
-    entry_points={"console_scripts": ["pywalfox=pywalfox.__main__:main"]},
+    entry_points={"console_scripts": [
+        "pywalfox=pywalfox.__main__:main",
+        "pywalfoxctl=pywalfox.__main__:main",
+    ]},
     python_requires=">=3.6",
     include_package_data=True,
     zip_safe=False)
