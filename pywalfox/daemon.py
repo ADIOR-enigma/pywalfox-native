@@ -1,4 +1,5 @@
 import sys
+import json
 import logging
 from threading import Thread
 
@@ -151,6 +152,17 @@ class Daemon:
                         message=message,
                     ))
 
+    def send_option_set(self, data):
+        """
+        Sends an extension option change requested by the CLI.
+
+        :param data object: option payload to forward to the extension
+        """
+        self.messenger.send_message(Message(
+            ACTIONS['OPTION_SET'],
+            data=data,
+        ))
+
     def send_theme_mode(self, mode):
         """
         Sends the new theme mode to be activated.
@@ -197,25 +209,51 @@ class Daemon:
             logging.error('action was not defined')
             self.send_invalid_action()
 
+    def handle_socket_command(self, message):
+        """Handles commands received from the local CLI socket."""
+        if message is None:
+            return
+
+        try:
+            command = json.loads(message)
+        except ValueError:
+            command = None
+
+        if isinstance(command, dict):
+            action = command.get('action')
+            if action == COMMANDS['OPTION_SET']:
+                data = command.get('data')
+                if isinstance(data, dict) and data.get('option'):
+                    logging.debug('CLI: Set option %s' % data.get('option'))
+                    self.send_option_set(data)
+                else:
+                    logging.error('CLI option:set command missing option data')
+                return
+
+            logging.debug('CLI: %s: no such socket action' % action)
+            return
+
+        if message == COMMANDS['UPDATE']:
+            logging.debug('CLI: Update pywal colors')
+            self.send_pywal_colors()
+        elif message == COMMANDS['THEME_MODE_DARK']:
+            logging.debug('CLI: Set theme mode to dark')
+            save_settings({'theme_mode': 'dark'})
+            self.send_theme_mode('dark')
+        elif message == COMMANDS['THEME_MODE_LIGHT']:
+            logging.debug('CLI: Set theme mode to light')
+            save_settings({'theme_mode': 'light'})
+            self.send_theme_mode('light')
+        elif message == COMMANDS['THEME_MODE_AUTO']:
+            logging.debug('CLI: Set theme mode to auto')
+            save_settings({'theme_mode': 'auto'})
+            self.send_theme_mode('auto')
+
     def socket_thread_worker(self):
         """The socket server thread worker."""
         while True:
             message = self.socket_server.get_message()
-            if message == COMMANDS['UPDATE']:
-                logging.debug('CLI: Update pywal colors')
-                self.send_pywal_colors()
-            elif message == COMMANDS['THEME_MODE_DARK']:
-                logging.debug('CLI: Set theme mode to dark')
-                save_settings({'theme_mode': 'dark'})
-                self.send_theme_mode('dark')
-            elif message == COMMANDS['THEME_MODE_LIGHT']:
-                logging.debug('CLI: Set theme mode to light')
-                save_settings({'theme_mode': 'light'})
-                self.send_theme_mode('light')
-            elif message == COMMANDS['THEME_MODE_AUTO']:
-                logging.debug('CLI: Set theme mode to auto')
-                save_settings({'theme_mode': 'auto'})
-                self.send_theme_mode('auto')
+            self.handle_socket_command(message)
 
     def start_socket_server(self):
         """Starts the socket server and creates the socket thread."""
