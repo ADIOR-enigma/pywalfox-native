@@ -4,6 +4,11 @@ import tempfile
 
 DAEMON_VERSION = '2.9.0'
 
+NATIVE_MESSAGING_EXTENSION_IDS = (
+    'pywalfox@frewacom.org',
+    'pywalfox@adior.org',
+)
+
 if sys.platform.startswith('win32'):
     UNIX_SOCKET_PATH = None
 else:
@@ -52,11 +57,14 @@ ACTIONS = {
     'CSS_DISABLE': 'css:disable',
     'CSS_FONT_SIZE': 'css:font:size',
     'THEME_MODE': 'theme:mode',
+    'OPTION_SET': 'option:set',
 }
+
 
 COMMANDS = {
     'THEME_MODE_DARK': 'theme:mode:dark',
     'THEME_MODE_LIGHT': 'theme:mode:light',
     'THEME_MODE_AUTO': 'theme:mode:auto',
     'UPDATE': 'action:update',
+    'OPTION_SET': 'option:set',
 }
