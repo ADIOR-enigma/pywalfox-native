@@ -4,6 +4,11 @@ import tempfile
 
 DAEMON_VERSION = '2.9.0'
 
+NATIVE_MESSAGING_EXTENSION_IDS = (
+    'pywalfox@frewacom.org',
+    'pywalfox@adior.org',
+)
+
 if sys.platform.startswith('win32'):
     UNIX_SOCKET_PATH = None
 else:

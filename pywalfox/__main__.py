@@ -8,7 +8,7 @@ import subprocess
 
 from .daemon import Daemon
 from .utils.logger import setup_logging
-from .config import DAEMON_VERSION, LOG_FILE_PATH, COMMANDS, EXECUTABLE_PATH
+from .config import DAEMON_VERSION, LOG_FILE_PATH, COMMANDS, EXECUTABLE_PATH, NATIVE_MESSAGING_EXTENSION_IDS
 from .settings import save_settings
 
 if sys.platform.startswith('win32'):
@@ -24,8 +24,12 @@ else:
 # errors and simply start the executable anyway.
 #
 # https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging#exchanging_messages
+def is_native_messaging_invocation():
+    """Checks if Firefox launched pywalfox as a native messaging host."""
+    return len(sys.argv) == 3 and sys.argv[2] in NATIVE_MESSAGING_EXTENSION_IDS
+
 def handle_error(self, message=None):
-    if len(sys.argv) == 3 and sys.argv[2] == 'pywalfox@frewacom.org':
+    if is_native_messaging_invocation():
         apply_saved_profile_path()
         setup_logging(False, False)
         run_daemon()
